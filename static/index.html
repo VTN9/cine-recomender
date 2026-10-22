@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CineMatch AI | Recomendador Inteligente de Pelis y Series</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Google Fonts: Plus Jakarta Sans -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Plus Jakarta Sans', 'sans-serif'],
+          },
+          colors: {
+            cinema: {
+              red: '#E50914',
+              gold: '#F5C518',
+              violet: '#8B5CF6',
+              dark: '#0B0F17',
+              card: '#131B2A',
+              border: '#1E293B'
+            }
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="bg-[#090D16] text-slate-100 min-h-screen flex flex-col font-sans antialiased selection:bg-violet-600 selection:text-white">
+
+  <!-- Navbar -->
+  <header class="sticky top-0 z-40 backdrop-blur-xl bg-[#090D16]/80 border-b border-slate-800/80">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center gap-3 cursor-pointer" onclick="switchTab('discover')">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-violet-600 to-indigo-500 flex items-center justify-center shadow-lg shadow-violet-500/25 ring-1 ring-white/20">
+          <i data-lucide="film" class="w-5 h-5 text-white"></i>
+        </div>
+        <div>
+          <span class="text-xl font-bold bg-gradient-to-r from-white via-slate-200 to-violet-400 bg-clip-text text-transparent">CineMatch</span>
+          <span class="text-xs px-2 py-0.5 ml-1.5 rounded-full bg-violet-500/10 text-violet-400 border border-violet-500/20 font-semibold tracking-wide">AI</span>
+        </div>
+      </div>
+
+      <!-- Navigation Tabs -->
+      <nav class="hidden md:flex items-center gap-1 bg-slate-900/90 p-1 rounded-xl border border-slate-800">
+        <button id="nav-discover" onclick="switchTab('discover')" class="px-4 py-1.5 text-sm font-medium rounded-lg transition-all text-white bg-violet-600 shadow-sm">
+          <i data-lucide="sparkles" class="w-4 h-4 inline mr-1.5"></i>Descubrir con IA
+        </button>
+        <button id="nav-couple" onclick="switchTab('couple')" class="px-4 py-1.5 text-sm font-medium rounded-lg transition-all text-slate-400 hover:text-white hover:bg-slate-800">
+          <i data-lucide="users" class="w-4 h-4 inline mr-1.5"></i>Modo Pareja
+        </button>
+        <button id="nav-trending" onclick="switchTab('trending')" class="px-4 py-1.5 text-sm font-medium rounded-lg transition-all text-slate-400 hover:text-white hover:bg-slate-800">
+          <i data-lucide="flame" class="w-4 h-4 inline mr-1.5"></i>Tendencias
+        </button>
+      </nav>
+
+      <!-- Right Actions -->
+      <div class="flex items-center gap-3">
+        <button onclick="openSettingsModal()" class="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 text-sm font-medium transition hover:border-slate-700">
+          <i data-lucide="settings" class="w-4 h-4 text-violet-400"></i>
+          <span class="hidden sm:inline">Ajustes & API</span>
+          <span id="api-status-badge" class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
+
+    <!-- TAB 1: DESCUBRIR CON IA -->
+    <section id="tab-discover" class="space-y-8">
+      
+      <!-- Hero Box -->
+      <div class="relative overflow-hidden rounded-3xl bg-gradient-to-b from-slate-900/90 via-[#0e1626]/80 to-[#090D16] border border-slate-800/80 p-6 sm:p-10 text-center shadow-2xl">
+        <div class="absolute -top-24 left-1/2 -translate-x-1/2 w-96 h-96 bg-violet-600/20 blur-[120px] rounded-full pointer-events-none"></div>
+        <div class="absolute top-1/2 -right-24 w-64 h-64 bg-indigo-500/10 blur-[100px] rounded-full pointer-events-none"></div>
+
+        <div class="relative z-10 max-w-3xl mx-auto space-y-4">
+          <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-violet-500/10 border border-violet-500/20 text-violet-300 text-xs font-semibold">
+            <i data-lucide="brain" class="w-3.5 h-3.5"></i> Potenciado por OpenRouter & LLMs de Vanguardia
+          </div>
+          <h1 class="text-3xl sm:text-5xl font-extrabold tracking-tight text-white leading-tight">
+            Dile qué te apetece.<br>
+            <span class="bg-gradient-to-r from-violet-400 via-indigo-300 to-amber-300 bg-clip-text text-transparent">La IA encuentra la joya perfecta.</span>
+          </h1>
+          <p class="text-slate-400 text-sm sm:text-base max-w-2xl mx-auto">
+            Se acabó scrollear 45 minutos sin decidirte. Describe la atmósfera, un giro que buscas o tu estado de ánimo y te diremos exactamente <span class="text-slate-200 font-medium">dónde verla hoy</span>.
+          </p>
+
+          <!-- AI Search Form -->
+          <form id="search-form" onsubmit="handleSearch(event)" class="mt-8 space-y-4 text-left">
+            <div class="relative group">
+              <div class="absolute -inset-0.5 bg-gradient-to-r from-violet-600 to-indigo-600 rounded-2xl blur opacity-30 group-hover:opacity-70 transition duration-300"></div>
+              <div class="relative flex items-center bg-slate-900/95 border border-slate-700/80 rounded-2xl p-2 shadow-2xl">
+                <i data-lucide="search" class="w-6 h-6 text-slate-400 ml-3"></i>
+                <input 
+                  id="search-input" 
+                  type="text" 
+                  placeholder="Ej: 'Pelis de misterio en un tren con nieve con final inesperado' o 'Comedia ligera como Ted Lasso'..."
+                  class="w-full bg-transparent border-0 focus:ring-0 text-white placeholder-slate-500 px-3 py-2 text-sm sm:text-base focus:outline-none"
+                  required
+                />
+                <button type="submit" id="btn-search" class="px-5 py-3 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white font-semibold text-sm transition shadow-lg shadow-violet-600/30 flex items-center gap-2 whitespace-nowrap">
+                  <span>Recomendar</span>
+                  <i data-lucide="wand-2" class="w-4 h-4"></i>
+                </button>
+              </div>
+            </div>
+
+            <!-- Filters Bar -->
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+              <!-- Platform selector -->
+              <div>
+                <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Plataforma</label>
+                <select id="filter-platform" class="w-full bg-slate-900 border border-slate-700/80 rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-violet-500 transition">
+                  <option value="Todas">🍿 Todas las plataformas</option>
+                  <option value="Netflix">Netflix</option>
+                  <option value="Prime Video">Amazon Prime Video</option>
+                  <option value="Max">Max (HBO)</option>
+                  <option value="Disney+">Disney+</option>
+                  <option value="Filmin">Filmin (Cine de autor)</option>
+                  <option value="Apple TV+">Apple TV+</option>
+                  <option value="Movistar+">Movistar+</option>
+                </select>
+              </div>
+
+              <!-- Content type -->
+              <div>
+                <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Formato</label>
+                <select id="filter-type" class="w-full bg-slate-900 border border-slate-700/80 rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-violet-500 transition">
+                  <option value="both">🎬 Películas y Series</option>
+                  <option value="movie">Solo Películas</option>
+                  <option value="tv">Solo Series</option>
+                </select>
+              </div>
+
+              <!-- Mood selector -->
+              <div>
+                <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Mood / Estado de Ánimo</label>
+                <select id="filter-mood" class="w-full bg-slate-900 border border-slate-700/80 rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-violet-500 transition">
+                  <option value="cualquiera">✨ Cualquier emoción</option>
+                  <option value="mente-explotada">🤯 Mente Explotada (Mindfuck)</option>
+                  <option value="domingo-manta">☕ Domingo de Manta y Sofá</option>
+                  <option value="llorar">😭 Ganas de Llorar a Gusto</option>
+                  <option value="adrenalina">⚡ Adrenalina y Tensión Máxima</option>
+                  <option value="risas">😂 Risas y Cero Preocupaciones</option>
+                  <option value="cine-autor">🎨 Joya Cinematográfica Profunda</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Quick Pill Suggestions -->
+            <div class="pt-2 flex flex-wrap items-center gap-2">
+              <span class="text-xs text-slate-400 font-medium">Prueba con:</span>
+              <button type="button" onclick="setQuickSearch('Películas parecidas a Interstellar pero en el fondo del mar')" class="text-xs px-3 py-1 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 border border-slate-700/60 transition">
+                🌊 Como Interstellar bajo el mar
+              </button>
+              <button type="button" onclick="setQuickSearch('Thriller nórdico con mucha nieve y asesinatos imposibles')" class="text-xs px-3 py-1 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 border border-slate-700/60 transition">
+                ❄️ Thriller nórdico en la nieve
+              </button>
+              <button type="button" onclick="setQuickSearch('Comedia inteligente de humor negro con giros constantes')" class="text-xs px-3 py-1 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 border border-slate-700/60 transition">
+                🎯 Humor negro ingenioso
+              </button>
+              <button type="button" onclick="setQuickSearch('Serie corta adictiva para devorar en un solo fin de semana')" class="text-xs px-3 py-1 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 border border-slate-700/60 transition">
+                ⚡ Miniserie para maratonear
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- Loading State -->
+      <div id="loading-spinner" class="hidden text-center py-16 space-y-4">
+        <div class="inline-block relative w-16 h-16">
+          <div class="w-16 h-16 rounded-full border-4 border-violet-500/20 border-t-violet-500 animate-spin"></div>
+          <i data-lucide="film" class="w-6 h-6 text-violet-400 absolute inset-0 m-auto"></i>
+        </div>
+        <p class="text-slate-300 font-semibold text-lg">Consultando a la IA a través de OpenRouter...</p>
+        <p class="text-slate-500 text-sm">Analizando catálogos de streaming, puntuaciones y afinidad temática</p>
+      </div>
+
+      <!-- Results Section -->
+      <div id="results-container" class="hidden space-y-6">
+        <!-- AI Summary Card -->
+        <div class="bg-gradient-to-r from-violet-950/40 via-indigo-950/20 to-slate-900 border border-violet-500/30 rounded-2xl p-5 flex items-start gap-4 shadow-xl">
+          <div class="p-2.5 rounded-xl bg-violet-600/20 border border-violet-500/30 text-violet-400 shrink-0">
+            <i data-lucide="sparkles" class="w-5 h-5"></i>
+          </div>
+          <div class="space-y-1">
+            <h3 class="text-sm font-bold text-violet-300 uppercase tracking-wider">Veredicto del Curador IA</h3>
+            <p id="results-summary" class="text-slate-200 text-sm sm:text-base leading-relaxed"></p>
+          </div>
+        </div>
+
+        <!-- Movie Cards Grid -->
+        <div id="movies-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <!-- Dynamically populated -->
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 2: MODO PAREJA / MATCH -->
+    <section id="tab-couple" class="hidden space-y-8">
+      <div class="max-w-3xl mx-auto text-center space-y-3">
+        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs font-semibold">
+          <i data-lucide="heart" class="w-3.5 h-3.5"></i> Fin a las discusiones del sofá
+        </div>
+        <h2 class="text-3xl font-extrabold text-white">Modo Pareja & Amigos</h2>
+        <p class="text-slate-400 text-sm sm:text-base">
+          ¿Uno quiere tiros y acción y el otro comedia romántica o drama? La IA analiza ambos gustos opuestos y encuentra el <span class="text-rose-400 font-semibold">puente cinematográfico perfecto</span>.
+        </p>
+      </div>
+
+      <div class="max-w-3xl mx-auto bg-slate-900/90 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6">
+        <form id="couple-form" onsubmit="handleCoupleMatch(event)" class="space-y-6">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            <!-- Persona 1 -->
+            <div class="space-y-2">
+              <label class="flex items-center gap-2 text-sm font-bold text-violet-300">
+                <i data-lucide="user" class="w-4 h-4"></i> Persona 1 (Tus gustos de hoy)
+              </label>
+              <textarea 
+                id="couple-p1" 
+                rows="3" 
+                placeholder="Ej: 'Quiero algo de terror psicológico con tensión constante o ciencia ficción oscura'"
+                class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-violet-500 transition"
+                required
+              ></textarea>
+            </div>
+
+            <!-- Persona 2 -->
+            <div class="space-y-2">
+              <label class="flex items-center gap-2 text-sm font-bold text-rose-300">
+                <i data-lucide="user-check" class="w-4 h-4"></i> Persona 2 (Sus gustos de hoy)
+              </label>
+              <textarea 
+                id="couple-p2" 
+                rows="3" 
+                placeholder="Ej: 'Cero sangre ni sustos. Quiero algo gracioso, entretenido o un misterio elegante que no de pesadillas'"
+                class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-rose-500 transition"
+                required
+              ></textarea>
+            </div>
+          </div>
+
+          <div class="flex items-center justify-between flex-wrap gap-4 pt-2 border-t border-slate-800">
+            <div class="flex items-center gap-2">
+              <span class="text-xs text-slate-400 font-semibold">Plataforma disponible:</span>
+              <select id="couple-platform" class="bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-200">
+                <option value="Todas">Cualquiera</option>
+                <option value="Netflix">Netflix</option>
+                <option value="Prime Video">Prime Video</option>
+                <option value="Max">Max</option>
+                <option value="Disney+">Disney+</option>
+              </select>
+            </div>
+
+            <button type="submit" id="btn-couple" class="px-6 py-2.5 rounded-xl bg-gradient-to-r from-violet-600 to-rose-600 hover:from-violet-500 hover:to-rose-500 text-white font-semibold text-sm transition shadow-lg shadow-rose-600/20 flex items-center gap-2">
+              <span>Calcular Punto Medio</span>
+              <i data-lucide="sparkles" class="w-4 h-4"></i>
+            </button>
+          </div>
+        </form>
+
+        <!-- Couple Result Display -->
+        <div id="couple-result" class="hidden border-t border-slate-800 pt-6 space-y-4">
+          <!-- Dynamically filled -->
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 3: TENDENCIAS Y CLÁSICOS -->
+    <section id="tab-trending" class="hidden space-y-6">
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h2 class="text-2xl sm:text-3xl font-extrabold text-white">Películas y Series en Tendencia</h2>
+          <p class="text-slate-400 text-sm">Títulos imprescindibles con alta valoración y disponibilidad en streaming</p>
+        </div>
+
+        <!-- Platform filter for trending -->
+        <div class="flex items-center gap-2">
+          <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider hidden sm:inline">Filtrar por:</span>
+          <select id="select-trending-platform" onchange="filterTrending(this.value)" class="bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-violet-500">
+            <option value="Todas">🍿 Todas las plataformas</option>
+            <option value="Netflix">Netflix</option>
+            <option value="Prime Video">Amazon Prime Video</option>
+            <option value="Max">Max (HBO)</option>
+            <option value="Disney+">Disney+</option>
+            <option value="Filmin">Filmin</option>
+            <option value="Apple TV+">Apple TV+</option>
+            <option value="Movistar+">Movistar+</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Quick Platform Filter Pills -->
+      <div class="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none" id="trending-platform-pills">
+        <button onclick="filterTrending('Todas')" data-platform="Todas" class="pill-platform active-pill px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap bg-violet-600 text-white shadow-md shadow-violet-600/30">
+          <span>🍿 Todas</span>
+        </button>
+        <button onclick="filterTrending('Netflix')" data-platform="Netflix" class="pill-platform px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap bg-slate-900 text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800">
+          <span class="w-2 h-2 rounded-full bg-[#E50914]"></span>
+          <span>Netflix</span>
+        </button>
+        <button onclick="filterTrending('Prime Video')" data-platform="Prime Video" class="pill-platform px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap bg-slate-900 text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800">
+          <span class="w-2 h-2 rounded-full bg-[#00A8E1]"></span>
+          <span>Prime Video</span>
+        </button>
+        <button onclick="filterTrending('Max')" data-platform="Max" class="pill-platform px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap bg-slate-900 text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800">
+          <span class="w-2 h-2 rounded-full bg-[#9333EA]"></span>
+          <span>Max</span>
+        </button>
+        <button onclick="filterTrending('Disney+')" data-platform="Disney+" class="pill-platform px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap bg-slate-900 text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800">
+          <span class="w-2 h-2 rounded-full bg-[#3B82F6]"></span>
+          <span>Disney+</span>
+        </button>
+        <button onclick="filterTrending('Filmin')" data-platform="Filmin" class="pill-platform px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap bg-slate-900 text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800">
+          <span class="w-2 h-2 rounded-full bg-[#10B981]"></span>
+          <span>Filmin</span>
+        </button>
+        <button onclick="filterTrending('Apple TV+')" data-platform="Apple TV+" class="pill-platform px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap bg-slate-900 text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800">
+          <span class="w-2 h-2 rounded-full bg-slate-200"></span>
+          <span>Apple TV+</span>
+        </button>
+        <button onclick="filterTrending('Movistar+')" data-platform="Movistar+" class="pill-platform px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap bg-slate-900 text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800">
+          <span class="w-2 h-2 rounded-full bg-[#06B6D4]"></span>
+          <span>Movistar+</span>
+        </button>
+      </div>
+
+      <!-- Info counter / filter status -->
+      <div class="flex items-center justify-between text-xs text-slate-400">
+        <span id="trending-count-text">Cargando catálogo...</span>
+      </div>
+
+      <div id="trending-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <!-- Rendered by JS -->
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="border-t border-slate-900 bg-slate-950/50 py-6 mt-12 text-center text-xs text-slate-500">
+    <div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+      <div class="flex items-center gap-2">
+        <i data-lucide="film" class="w-4 h-4 text-violet-400"></i>
+        <span class="text-slate-400 font-semibold">CineMatch AI</span> — Proyecto Recomendador Local
+      </div>
+      <div>
+        Integrado con <a href="https://openrouter.ai" target="_blank" class="text-violet-400 hover:underline">OpenRouter API</a> & <a href="https://www.themoviedb.org/" target="_blank" class="text-slate-400 hover:underline">TMDb</a>
+      </div>
+    </div>
+  </footer>
+
+  <!-- SETTINGS MODAL -->
+  <div id="settings-modal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-6 relative">
+      <button onclick="closeSettingsModal()" class="absolute top-5 right-5 text-slate-400 hover:text-white p-1 rounded-lg">
+        <i data-lucide="x" class="w-5 h-5"></i>
+      </button>
+
+      <div class="space-y-1">
+        <div class="flex items-center gap-2">
+          <i data-lucide="key" class="w-5 h-5 text-violet-400"></i>
+          <h3 class="text-lg font-bold text-white">Configuración de APIs Locales</h3>
+        </div>
+        <p class="text-xs text-slate-400">Tus claves se guardan exclusivamente en tu propio ordenador en el archivo local <code class="text-violet-300">.env</code>.</p>
+      </div>
+
+      <form id="settings-form" onsubmit="saveSettings(event)" class="space-y-4">
+        <!-- OpenRouter Key -->
+        <div class="space-y-1.5">
+          <label class="block text-xs font-semibold text-slate-300">OpenRouter API Key <span class="text-rose-400">*</span></label>
+          <div class="relative">
+            <input 
+              id="cfg-openrouter-key" 
+              type="password" 
+              placeholder="sk-or-v1-xxxxxxxxxxxxxxxxxxxx"
+              class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-violet-500"
+            />
+            <button type="button" onclick="togglePasswordView('cfg-openrouter-key')" class="absolute right-3 top-2.5 text-slate-500 hover:text-slate-300">
+              <i data-lucide="eye" class="w-4 h-4"></i>
+            </button>
+          </div>
+          <p class="text-[11px] text-slate-500">¿No tienes clave? Puedes conseguirla gratis o con recarga mínima en <a href="https://openrouter.ai/keys" target="_blank" class="text-violet-400 underline">openrouter.ai/keys</a>.</p>
+        </div>
+
+        <!-- Model selector -->
+        <div class="space-y-1.5">
+          <label class="block text-xs font-semibold text-slate-300">Modelo de Inteligencia Artificial</label>
+          <select id="cfg-openrouter-model" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-violet-500">
+            <!-- Populated via API -->
+          </select>
+        </div>
+
+        <!-- TMDb Key (Optional) -->
+        <div class="space-y-1.5">
+          <label class="block text-xs font-semibold text-slate-300">TMDb API Key (Opcional - Para carátulas oficiales)</label>
+          <input 
+            id="cfg-tmdb-key" 
+            type="password" 
+            placeholder="Introduce tu clave de themoviedb.org"
+            class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-violet-500"
+          />
+        </div>
+
+        <div class="pt-2 flex items-center justify-end gap-3">
+          <button type="button" onclick="closeSettingsModal()" class="px-4 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-white">Cancelar</button>
+          <button type="submit" class="px-5 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold transition shadow-lg shadow-violet-600/30">Guardar Cambios</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
