@@ -347,8 +347,83 @@ async def get_trending(platform: str = "Todas"):
 
 import urllib.parse
 
-# Clave pública de TMDb para posters y metadatos garantizados
-DEFAULT_TMDB_KEY = "4e44d9029b1270a757cddc766a1bcb63"
+# Cadena ordenada de modelos gratuitos fiables de respaldo en OpenRouter
+FREE_FALLBACK_CHAIN = [
+    "minimax/minimax-m3.1-flash:free",
+    "nvidia/nemotron-3.5-lightning:free",
+    "google/gemma-4-26b-a4b-it:free",
+    "google/gemma-4-31b-it:free",
+    "liquid/lfm-2.5-2.6b:free",
+    "recursive/flint-v1.0:free"
+]
+
+
+async def query_openrouter_with_auto_fallback(
+    api_key: str, 
+    requested_model: str, 
+    messages: list, 
+    temperature: float = 0.6
+) -> tuple[str, str, bool]:
+    """
+    Envía la consulta a OpenRouter. Si el modelo preferido se agota (HTTP 429),
+    da error 404, 402 (sin saldo) o 503, cambia AUTOMÁTICAMENTE al siguiente
+    modelo gratuito de la lista hasta encontrar uno disponible.
+    Devuelve: (contenido_respuesta, modelo_usado, se_uso_fallback).
+    """
+    # Lista de modelos a intentar: primero el solicitado, luego el resto de gratuitos
+    models_to_try = [requested_model]
+    for m in FREE_FALLBACK_CHAIN:
+        if m not in models_to_try:
+            models_to_try.append(m)
+
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "HTTP-Referer": "http://localhost:8000",
+        "X-Title": "CineMatch AI Recommender",
+        "Content-Type": "application/json"
+    }
+
+    last_error = ""
+
+    async with httpx.AsyncClient(timeout=35.0) as client:
+        for idx, model_name in enumerate(models_to_try):
+            try:
+                payload = {
+                    "model": model_name,
+                    # Respaldo secundario automático dentro del propio OpenRouter
+                    "models": [model_name] + [m for m in FREE_FALLBACK_CHAIN if m != model_name],
+                    "messages": messages,
+                    "temperature": temperature
+                }
+
+                resp = await client.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=payload)
+                
+                if resp.status_code == 200:
+                    data = resp.json()
+                    choices = data.get("choices", [])
+                    if choices and "message" in choices[0]:
+                        content = choices[0]["message"]["content"]
+                        actual_model = data.get("model", model_name)
+                        used_fallback = (idx > 0)
+                        if used_fallback:
+                            print(f"🔄 [Auto-Fallback Activo] Modelo inicial no disponible. Respuesta generada con éxito por: {actual_model}")
+                        else:
+                            print(f"✅ Respuesta exitosa generada con: {actual_model}")
+                        return content, actual_model, used_fallback
+
+                # Si falló (ej: 429 límite alcanzado, 402 sin créditos, 404 retirado, 503 sobrecarga)
+                err_text = resp.text
+                print(f"⚠️ Modelo '{model_name}' dio HTTP {resp.status_code} ({err_text[:80]}...). Probando siguiente modelo gratuito...")
+                last_error = f"HTTP {resp.status_code}: {err_text[:120]}"
+
+            except (httpx.TimeoutException, httpx.RequestError) as ex:
+                print(f"⚠️ Timeout/Red con '{model_name}': {ex}. Cambiando a otro modelo gratuito...")
+                last_error = str(ex)
+
+    raise HTTPException(
+        status_code=503, 
+        detail=f"Todos los modelos gratuitos de OpenRouter están temporalmente saturados. Detalle: {last_error}"
+    )
 
 async def search_movie_poster(title: str, original_title: Optional[str] = None, year: Optional[int] = None) -> dict:
     """Busca en TMDb y OMDb el poster oficial en alta resolución"""
@@ -446,56 +521,38 @@ async def recommend_movies(req: RecommendationRequest):
         user_query += f"Estado de ánimo / Mood: {req.mood}.\n"
 
     try:
-        async with httpx.AsyncClient(timeout=35.0) as client:
-            headers = {
-                "Authorization": f"Bearer {api_key}",
-                "HTTP-Referer": "http://localhost:8000",
-                "X-Title": "CineMatch AI Recommender",
-                "Content-Type": "application/json"
-            }
-            payload = {
-                "model": model,
-                "messages": [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_query}
-                ],
-                "temperature": 0.6
-            }
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_query}
+        ]
+        raw_content, actual_model, used_fallback = await query_openrouter_with_auto_fallback(
+            api_key=api_key,
+            requested_model=model,
+            messages=messages,
+            temperature=0.6
+        )
+        parsed_data = extract_json_from_text(raw_content)
 
-            resp = await client.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=payload)
-            
-            if resp.status_code != 200:
-                # Si el modelo no está disponible o requiere saldo, intentar con el modelo gratuito de fallback
-                if "minimax" not in model:
-                    payload["model"] = "minimax/minimax-m3.1-flash:free"
-                    resp = await client.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=payload)
-                
-                if resp.status_code != 200:
-                    raise HTTPException(status_code=resp.status_code, detail=f"OpenRouter: {resp.text}")
+        for rec in parsed_data.get("recommendations", []):
+            tmdb_info = await search_movie_poster(
+                title=rec.get("title", ""),
+                original_title=rec.get("original_title", ""),
+                year=rec.get("year")
+            )
+            if tmdb_info.get("poster"):
+                rec["poster"] = tmdb_info["poster"]
+            else:
+                rec["poster"] = "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=500&auto=format&fit=crop&q=80"
+            if tmdb_info.get("backdrop"):
+                rec["backdrop"] = tmdb_info["backdrop"]
 
-            res_json = resp.json()
-            raw_content = res_json["choices"][0]["message"]["content"]
-            parsed_data = extract_json_from_text(raw_content)
-
-            for rec in parsed_data.get("recommendations", []):
-                tmdb_info = await search_movie_poster(
-                    title=rec.get("title", ""),
-                    original_title=rec.get("original_title", ""),
-                    year=rec.get("year")
-                )
-                if tmdb_info.get("poster"):
-                    rec["poster"] = tmdb_info["poster"]
-                else:
-                    rec["poster"] = "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=500&auto=format&fit=crop&q=80"
-                if tmdb_info.get("backdrop"):
-                    rec["backdrop"] = tmdb_info["backdrop"]
-
-            return {
-                "demo_mode": False,
-                "model_used": model,
-                "summary": parsed_data.get("summary", "Aquí tienes tus recomendaciones personalizadas:"),
-                "recommendations": parsed_data.get("recommendations", [])
-            }
+        return {
+            "demo_mode": False,
+            "model_used": actual_model,
+            "fallback_active": used_fallback,
+            "summary": parsed_data.get("summary", "Aquí tienes tus recomendaciones personalizadas:"),
+            "recommendations": parsed_data.get("recommendations", [])
+        }
 
     except json.JSONDecodeError:
         raise HTTPException(status_code=500, detail="La IA devolvió una respuesta que no pudimos interpretar como JSON. Intenta reformular ligeramente tu búsqueda.")
@@ -537,31 +594,22 @@ async def match_couple(req: CoupleMatchRequest):
     query = f"Persona 1: '{req.user1_preferences}'.\nPersona 2: '{req.user2_preferences}'.\nPlataforma: {req.platform}."
 
     try:
-        async with httpx.AsyncClient(timeout=35.0) as client:
-            headers = {
-                "Authorization": f"Bearer {api_key}",
-                "HTTP-Referer": "http://localhost:8000",
-                "X-Title": "CineMatch AI Recommender",
-                "Content-Type": "application/json"
-            }
-            resp = await client.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json={
-                "model": model,
-                "messages": [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": query}
-                ],
-                "temperature": 0.6
-            })
-
-            if resp.status_code != 200:
-                raise HTTPException(status_code=resp.status_code, detail=resp.text)
-
-            content = resp.json()["choices"][0]["message"]["content"]
-            match_data = extract_json_from_text(content)
-            poster_info = await search_movie_poster(match_data.get("title", ""))
-            if poster_info.get("poster"):
-                match_data["poster"] = poster_info["poster"]
-            return match_data
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": query}
+        ]
+        raw_content, actual_model, used_fallback = await query_openrouter_with_auto_fallback(
+            api_key=api_key,
+            requested_model=model,
+            messages=messages,
+            temperature=0.6
+        )
+        match_data = extract_json_from_text(raw_content)
+        poster_info = await search_movie_poster(match_data.get("title", ""))
+        if poster_info.get("poster"):
+            match_data["poster"] = poster_info["poster"]
+        match_data["model_used"] = actual_model
+        return match_data
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
